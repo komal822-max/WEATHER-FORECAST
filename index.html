@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Weather Forecast</title>
+    <script src="https://cdn.tailwindcss.com/3.4.16"></script>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/remixicon/4.6.0/remixicon.min.css"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+  <style>
+      :where([class^="ri-"])::before {
+        content: "\f3c2";
+      }
+      .weather-bg {
+        background: linear-gradient(135deg, #1c3148 0%, #257dbb 100%);
+      }
+      .glass-effect {
+        backdrop-filter: blur(10px);
+        background: rgba(6, 5, 5, 0.1);
+        border: 1px solid rgba(13, 13, 13, 0.2);
+      }
+      .temperature-unit {
+        transition: all 0.3s ease;
+      }
+      .temperature-unit.active {
+        background: rgba(5, 5, 5, 0.3);
+      }
+      .hourly-scroll::-webkit-scrollbar {
+        height: 4px;
+      }
+      .hourly-scroll::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 2px;
+      }
+      .hourly-scroll::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 2px;
+      }
+      .weather-card {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+      .weather-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+      }
+      .search-suggestions {
+        max-height: 200px;
+        overflow-y: auto;
+      }
+      .loading-spinner {
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .fade-in {
+        animation: fadeIn 0.5s ease-in;
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+    </style>
+  </head>
+  <body class="min-h-screen weather-bg text-white">
+    <div class="container mx-auto px-4 py-6 max-w-6xl">
+      <!-- Header Section -->
+      <header class="mb-8">
+        <div class="flex items-center justify-between mb-6">
+          <h1 class="text-3xl font-extrabold text-white">Weather App 🌤️</h1>
+          <div class="flex items-center gap-4">
+            <button
+              id="refreshBtn"
+              class="w-10 h-10 flex items-center justify-center glass-effect rounded-full hover:bg-white/20 transition-colors !rounded-button whitespace-nowrap"
+            >
+              <i class="ri-refresh-line text-lg"></i>
+            </button>
+            <div class="flex items-center gap-2 glass-effect rounded-full p-1">
+              <button
+                id="celsiusBtn"
+                class="temperature-unit px-3 py-1 rounded-full text-sm font-medium active !rounded-button whitespace-nowrap"
+              >
+                °C
+              </button>
+              <button
+                id="fahrenheitBtn"
+                class="temperature-unit px-3 py-1 rounded-full text-sm font-medium !rounded-button whitespace-nowrap"
+              >
+                °F
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Search Section -->
+        <div class="relative max-w-md mx-auto">
+          <div class="relative">
+            <input
+              type="text"
+              id="searchInput"
+              placeholder="Search for a city..."
+              class="w-full px-4 py-3 pl-12 pr-12 glass-effect rounded-xl text-white placeholder-white/70 border-none focus:outline-none focus:ring-2 focus:ring-white/30 text-sm"
+            />
+            <div
+              class="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 flex items-center justify-center"
+            >
+              <i class="ri-search-line text-white/70"></i>
+            </div>
+            <button
+              id="locationBtn"
+              class="absolute right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 flex items-center justify-center hover:bg-white/20 rounded-full transition-colors !rounded-button whitespace-nowrap"
+            >
+              <i class="ri-map-pin-line text-white/70"></i>
+            </button>
+          </div>
+          <div
+            id="searchSuggestions"
+            class="absolute top-full left-0 right-0 mt-2 glass-effect rounded-xl search-suggestions hidden z-10"
+          >
+            <!-- Search suggestions will be populated here -->
+          </div>
+        </div>
+      </header>
+      <!-- Current Weather Display -->
+      <section class="mb-8 fade-in">
+        <div class="text-center mb-8">
+          <div class="flex items-center justify-center mb-4">
+            <div class="w-20 h-20 flex items-center justify-center">
+              <i id="currentWeatherIcon" class="ri-sun-line text-6xl"></i>
+            </div>
+          </div>
+          <h2 id="currentLocation" class="text-3xl font-semibold mb-2">
+            New York, NY
+          </h2>
+          <div class="text-6xl font-light mb-2" id="currentTemp">22°</div>
+          <p id="currentCondition" class="text-lg text-white/80 mb-4">
+            Partly Cloudy
+          </p>
+          <p class="text-white/70">
+            Feels like <span id="feelsLike">25°</span>
+          </p>
+        </div>
+
+        <!-- Current Weather Metrics -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="glass-effect rounded-xl p-4 text-center weather-card">
+            <div class="w-8 h-8 flex items-center justify-center mx-auto mb-2">
+              <i class="ri-drop-line text-2xl text-primary"></i>
+            </div>
+            <p class="text-white/70 text-sm">Humidity</p>
+            <p class="text-xl font-semibold" id="humidity">65%</p>
+          </div>
+          <div class="glass-effect rounded-xl p-4 text-center weather-card">
+            <div class="w-8 h-8 flex items-center justify-center mx-auto mb-2">
+              <i class="ri-windy-line text-2xl text-primary"></i>
+            </div>
+            <p class="text-white/70 text-sm">Wind Speed</p>
+            <p class="text-xl font-semibold" id="windSpeed">12 km/h</p>
+          </div>
+          <div class="glass-effect rounded-xl p-4 text-center weather-card">
+            <div class="w-8 h-8 flex items-center justify-center mx-auto mb-2">
+              <i class="ri-eye-line text-3xl text-primary"></i>
+            </div>
+            <p class="text-white/70 text-sm">Visibility</p>
+            <p class="text-xl font-semibold" id="visibility">10 km</p>
+          </div>
+          <div class="glass-effect rounded-xl p-4 text-center weather-card">
+            <div class="w-8 h-8 flex items-center justify-center mx-auto mb-2">
+              <i class="ri-compass-line text-2xl text-primary"></i>
+            </div>
+            <p class="text-white/70 text-sm">Pressure</p>
+            <p class="text-xl font-semibold" id="pressure">1013 hPa</p>
+          </div>
+        </div>
+      </section>
+      <!-- Hourly Forecast Section -->
+      <section class="mb-8">
+        <h3 class="text-xl font-semibold mb-4">24-Hour Forecast</h3>
+        <div class="hourly-scroll overflow-x-auto pb-2">
+          <div class="flex gap-4 min-w-max" id="hourlyForecast">
+            <!-- Hourly forecast cards will be populated here -->
+          </div>
+        </div>
+      </section>
+      <!-- Temperature Trend Chart -->
+      <section class="mb-8">
+        <div class="glass-effect rounded-xl p-6">
+          <h3 class="text-xl font-semibold mb-4">Temperature Trend</h3>
+          <div id="temperatureChart" style="height: 300px"></div>
+        </div>
+      </section>
+
+      <!-- Extended Forecast Section -->
+      <section class="mb-8">
+        <h3 class="text-xl font-semibold mb-4">7-Day Forecast</h3>
+        <div class="space-y-3" id="weeklyForecast">
+          <!-- Weekly forecast cards will be populated here -->
+        </div>
+      </section>
+
+      <!-- Additional Weather Details -->
+      <section class="mb-8">
+        <div class="glass-effect rounded-xl p-6">
+          <button
+            id="toggleDetails"
+            class="w-full flex items-center justify-between text-left mb-4 !rounded-button whitespace-nowrap"
+          >
+            <h3 class="text-xl font-semibold">Additional Details</h3>
+            <div class="w-6 h-6 flex items-center justify-center">
+              <i
+                id="toggleIcon"
+                class="ri-arrow-down-s-line text-xl transition-transform"
+              ></i>
+            </div>
+          </button>
+          <div
+            id="detailsContent"
+            class="grid grid-cols-2 md:grid-cols-3 gap-4  "
+          >
+            <div class="text-center">
+              <div
+                class="w-8 h-8 flex items-center justify-center mx-auto mb-2"
+              >
+                <i class="ri-sun-line text-2xl text-secondary"></i>
+              </div>
+              <p class="text-white/70 text-sm">Sunrise</p>
+              <p class="font-semibold" id="sunrise">6:24 AM</p>
+            </div>
+            <div class="text-center">
+              <div
+                class="w-8 h-8 flex items-center justify-center mx-auto mb-2"
+              >
+                <i class="ri-moon-line text-2xl text-secondary"></i>
+              </div>
+              <p class="text-white/70 text-sm">Sunset</p>
+              <p class="font-semibold" id="sunset">7:45 PM</p>
+            </div>
+            <div class="text-center">
+              <div
+                class="w-8 h-8 flex items-center justify-center mx-auto mb-2"
+              >
+                <i class="ri-leaf-line text-2xl text-secondary"></i>
+              </div>
+              <p class="text-white/70 text-sm">Air Quality</p>
+              <p class="font-semibold" id="airQuality">Good</p>
+            </div>
+            <div class="text-center">
+              <div
+                class="w-8 h-8 flex items-center justify-center mx-auto mb-2"
+              >
+                <i class="ri-sun-cloudy-line text-2xl text-secondary"></i>
+              </div>
+              <p class="text-white/70 text-sm">UV Index</p>
+              <p class="font-semibold" id="uvIndex">5 Moderate</p>
+            </div>
+            <div class="text-center">
+              <div
+                class="w-8 h-8 flex items-center justify-center mx-auto mb-2"
+              >
+                <i class="ri-rainy-line text-2xl text-secondary"></i>
+              </div>
+              <p class="text-white/70 text-sm">Precipitation</p>
+              <p class="font-semibold" id="precipitation">15%</p>
+            </div>
+            <div class="text-center">
+              <div
+                class="w-8 h-8 flex items-center justify-center mx-auto mb-2"
+              >
+                <i class="ri-water-percent-line text-2xl text-secondary"></i>
+              </div>
+              <p class="text-white/70 text-sm">Dew Point</p>
+              <p class="font-semibold" id="dewPoint">18°</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Loading State -->
+      <div
+        id="loadingState"
+        class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden"
+      >
+        <div class="glass-effect rounded-xl p-6 text-center">
+          <div class="w-8 h-8 flex items-center justify-center mx-auto mb-4">
+            <i class="ri-loader-4-line text-2xl loading-spinner"></i>
+          </div>
+          <p>Loading weather data...</p>
+        </div>
+      </div>
+    </div>
+    <script src="index.js"></script>
+  </body>
+</html>
